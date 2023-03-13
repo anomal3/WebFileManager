@@ -31,13 +31,13 @@ Visual Studio support
 <details>
   <summary>IMAGES</summary>
   
- ![Result!](https://github.com/anomal3/WebFileManager/blob/master/CompanyFileManager/src/WebManager1.png "Results")
+ ![Result!](CompanyFileManager/src/CompanyFileManager/src/WebManager1.png "Results")
  
- ![Result!](master/CompanyFileManager/src/WebManager2.png "Results")
+ ![Result!](CompanyFileManager/src/WebManager2.png "Results")
  
  ![Result!](CompanyFileManager/src/WebManager3.png "Results")
  
- ![Result!](src/WebManager4.jpg "Results")
+ ![Result!](CompanyFileManager/src/WebManager4.jpg "Results")
  
 </details>
 
