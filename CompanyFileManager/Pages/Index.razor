@@ -1,0 +1,78 @@
+﻿@page "/"
+@using Data
+@using Microsoft.AspNetCore.Components
+
+<h2 class="pb-2">Сетевой диск</h2>
+<p class="pb-2 mw-1100">
+    Web версия сетевого диска
+</p>
+
+<p class="demo-text cw-320 mt-2">
+    Размер значков
+</p>
+<DxSpinEdit @bind-Value="@SizeIcon" SizeMode="SizeMode.Small" NullText="Введите размер..." CssClass="cw-320" />
+
+
+<br />
+
+<style>
+    .icons-style {
+        width: @(SizeIcon)px;
+    }
+</style>
+
+
+<div class="cw-320">
+    <DxTreeView ref="@treeView"
+                Data="@ApiFiles.ServerFiles"
+                @bind-FilterString="FilterString"
+                FilterMinLength="2"
+                ShowFilterPanel="true"
+                Target="_blank"
+                FilterMode="NavigationFilterMode.ParentBranch"
+                FilterNullText="Введите что хотите найти..."
+                AnimationType="LayoutAnimationType.Slide"
+                ShowExpandButtons="true"
+                NodeClick="@OnNodeClick">
+
+        <DataMappings>
+            <DxTreeViewDataMapping Key="Id" ParentKey="ParentId"
+                                   IconCssClass="Style"
+                                   Text="Name" IconUrl="Icon" NavigateUrl="NavigateUrl" /> <!--Enabled="enables"-->
+        </DataMappings>
+    </DxTreeView>
+</div>
+
+@code {
+
+    protected Int32 SizeIcon { get; set; } = 36;
+
+
+    string FilterString = "";
+    DxTreeView treeView;
+
+    protected override async Task OnInitializedAsync()
+    {
+       
+        ApiFiles.Initialize(Data.path);
+    }
+
+    private void OnExpanedChanged(TreeViewNodeCancelEventArgs obj)
+    {
+        Console.WriteLine(obj.NodeInfo.Name);
+    }
+
+    private async void OnNodeClick(TreeViewNodeClickEventArgs obj)
+    {
+        var _click_obj = ApiFiles.ServerFiles.FirstOrDefault(n => n.Name == obj.NodeInfo.Text).Id;
+
+        if (obj.NodeInfo.Text == "App_Data") return;
+
+
+        if (Directory.Exists(_click_obj)) ApiFiles.SubDir(_click_obj);
+        else Console.WriteLine("Тык");
+
+    }
+
+
+    }
