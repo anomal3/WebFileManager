@@ -33,9 +33,9 @@ Visual Studio support
   
  ![Result!](https://github.com/anomal3/WebFileManager/blob/master/CompanyFileManager/src/WebManager1.png "Results")
  
- ![Result!](https://github.com/anomal3/WebFileManager/blob/master/CompanyFileManager/src/WebManager2.png "Results")
+ ![Result!](blob/master/CompanyFileManager/src/WebManager2.png "Results")
  
- ![Result!](https://github.com/anomal3/WebFileManager/blob/master/CompanyFileManager/src/WebManager3.png "Results")
+ ![Result!](/WebFileManager/blob/master/CompanyFileManager/src/WebManager3.png "Results")
  
  ![Result!](WebFileManager/blob/master/CompanyFileManager/src/WebManager4.jpg "Results")
  
