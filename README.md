@@ -79,7 +79,7 @@ Visual Studio support
 |  :heavy_check_mark:   |  :x:   | :x: |
 
 <details>
-  <summary>Интерфейс программы</summary>
+  <summary>Скриншоты интерфейса программы</summary>
   
  ![Result!](CompanyFileManager/src/WebManager1.png "Results")
  
