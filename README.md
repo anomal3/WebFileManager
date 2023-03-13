@@ -22,6 +22,52 @@ catch (Exception ex) { Console.WriteLine(ex.Message); path = "C:\\"; }
 
 Поддержка мобильной версии.
 
+В папках с исполняемым файлом есть пример файла конфигурации __appsettings_example.json__
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Error",
+      "Microsoft": "Warning"
+    },
+    "Debug": {
+      "LogLevel": {
+        "Default": "Information",
+        "Microsoft.Hosting": "Trace"
+      }
+    },
+    "EventSource": {
+      "LogLevel": {
+        "Default": "Warning"
+      }
+    }
+  },
+  "_comment1": "ПРИМЕР ФАЙЛА КОНФИГУРАЦИИ",
+	"_comment2": "Для локального запуска используйте IPv4 локальной сети (пример -> 192.168.0.10:9999)",
+	"_comment3": "Для публичного доступа используйте IPv4 0.0.0.0:9999",
+	"_comment4": "Сервер будет доступен по внешнему IP адресу, а так же по локальной сети",
+  "Kestrel": {
+    "EndPoints": {
+		"Http": {
+        "Url": "http://0.0.0.0:9999"
+      }
+    }
+  },
+  "Console": {
+    "IncludeScopes": true,
+    "LogLevel": {
+      "Microsoft.AspNetCore.Mvc.Razor.Internal": "Warning",
+      "Microsoft.AspNetCore.Mvc.Razor.Razor": "Debug",
+      "Microsoft.AspNetCore.Mvc.Razor": "Error",
+      "Default": "Information"
+    }
+  },
+  "AllowedHosts": "*"
+}
+```
+
+
 
 [![License](https://img.shields.io/github/license/anomal3/WebFileManager)](https://sditsoft.ru/%D0%BF%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8C%D1%81%D0%BA%D0%BE%D0%B5-%D1%81%D0%BE%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5/)
 
