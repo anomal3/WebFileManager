@@ -20,6 +20,9 @@ catch (Exception ex) { Console.WriteLine(ex.Message); path = "C:\\"; }
 
 Внимание!!! НА ДАННЫЙ МОМЕНТ Менеджер не поддерживает исключения папок, такие как _"нету прав"_ или _"системная папка"_ 
 
+Поддержка мобильной версии.
+
+
 [![License](https://img.shields.io/github/license/anomal3/WebFileManager)](https://sditsoft.ru/%D0%BF%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8C%D1%81%D0%BA%D0%BE%D0%B5-%D1%81%D0%BE%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D0%B5/)
 
 Visual Studio support
@@ -29,9 +32,9 @@ Visual Studio support
 |  :heavy_check_mark:   |  :x:   | :x: |
 
 <details>
-  <summary>IMAGES</summary>
+  <summary>Интерфейс программы</summary>
   
- ![Result!](CompanyFileManager/src/CompanyFileManager/src/WebManager1.png "Results")
+ ![Result!](CompanyFileManager/src/WebManager1.png "Results")
  
  ![Result!](CompanyFileManager/src/WebManager2.png "Results")
  
@@ -43,3 +46,4 @@ Visual Studio support
 
 ---
 
+P.S. Проект построен с помощью фреймворка DevExpress 2022.3. Без него у Вас не будет пакетов Nuget что приведёт к ошибкам
