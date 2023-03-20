@@ -39,3 +39,35 @@ html, body {
     right: 0.75rem;
     top: 0.5rem;
 }
+
+.menu-icon {
+    width: 1rem;
+    height: 1rem;
+    min-width: 1rem;
+    min-height: 1rem;
+    background-size: contain;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    background-position: center center;
+    background-color: currentColor;
+}
+
+.menu-icon-sort-by {
+    mask-image: url("../images/Menu/sort.svg");
+    -webkit-mask-image: url("../images/Menu/sort.svg");
+}
+
+.menu-icon-copy {
+    mask-image: url("../images/Menu/copy.svg");
+    -webkit-mask-image: url("../images/Menu/copy.svg");
+}
+
+.menu-icon-cut {
+    mask-image: url("../images/Menu/cut.svg");
+    -webkit-mask-image: url("../images/Menu/cut.svg");
+}
+
+.menu-icon-clear {
+    mask-image: url("../images/Menu/clear.svg");
+    -webkit-mask-image: url("../images/Menu/clear.svg");
+}

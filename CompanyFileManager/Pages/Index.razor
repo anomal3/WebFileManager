@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using Data
 @using Microsoft.AspNetCore.Components
+@using System.Diagnostics.Tracing
 
 <h2 class="pb-2">Сетевой диск</h2>
 <p class="pb-2 mw-1100">
@@ -21,7 +22,7 @@
     }
 </style>
 
-
+<!-- @oncontextmenu="((e) => ShowContextMenu(treeView.Data, e))" @oncontextmenu:preventDefault-->
 <div class="cw-320">
     <DxTreeView ref="@treeView"
                 Data="@ApiFiles.ServerFiles"
@@ -33,7 +34,7 @@
                 FilterNullText="Введите что хотите найти..."
                 AnimationType="LayoutAnimationType.Slide"
                 ShowExpandButtons="true"
-                NodeClick="@OnNodeClick">
+                NodeClick="@OnNodeClick" @oncontextmenu="((e) => { ShowContextMenu(null, e); })" >
 
         <DataMappings>
             <DxTreeViewDataMapping Key="Id" ParentKey="ParentId"
@@ -43,6 +44,24 @@
     </DxTreeView>
 </div>
 
+<!--CONTEXT MENU-->
+<DxContextMenu @ref="@ContextMenu" ItemClick="@OnItemClick">
+    <Items>
+        <DxContextMenuItem Text="Сортировать по"  IconCssClass="menu-icon-sort-by menu-icon">
+            <Items>
+                <DxContextMenuItem Text="Имени"></DxContextMenuItem>
+                <DxContextMenuItem Text="Размеру"></DxContextMenuItem>
+                <DxContextMenuItem Text="Типу"></DxContextMenuItem>
+            </Items>
+        </DxContextMenuItem>
+        <DxContextMenuItem Text="Копировать" IconCssClass="menu-icon-copy menu-icon" BeginGroup="true"></DxContextMenuItem>
+        <DxContextMenuItem Text="Вырезать" IconCssClass="menu-icon-cut menu-icon"></DxContextMenuItem>
+        <DxContextMenuItem Text="Удалить" IconCssClass="menu-icon-clear menu-icon"></DxContextMenuItem>
+        <DxContextMenuItem Text="Выбрать всё" BeginGroup="true"></DxContextMenuItem>
+    </Items>
+</DxContextMenu>
+<!--CONTEXT MENU-->
+
 @code {
 
     protected Int32 SizeIcon { get; set; } = 36;
@@ -51,10 +70,18 @@
     string FilterString = "";
     DxTreeView treeView;
 
+    DxContextMenu? ContextMenu { get; set; }
+    string ClickedItem { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
-       
         ApiFiles.Initialize(Data.path);
+    }
+
+    async Task ShowContextMenu(object obj, MouseEventArgs e)
+    {
+        ContextMenu.ShowAsync(e);
+        if(obj != null) Console.WriteLine(obj);
     }
 
     private void OnExpanedChanged(TreeViewNodeCancelEventArgs obj)
@@ -68,6 +95,10 @@
 
         if (obj.NodeInfo.Text == "App_Data") return;
 
+        if (obj.MouseEventArgs.Button == 2)
+        {
+            ShowContextMenu(obj.NodeInfo.Text, new MouseEventArgs());
+        }
 
         if (Directory.Exists(_click_obj)) ApiFiles.SubDir(_click_obj);
         else Console.WriteLine("Тык");
@@ -75,4 +106,8 @@
     }
 
 
+    void OnItemClick(ContextMenuItemClickEventArgs args)
+    {
+        ClickedItem = args.ItemInfo.Text;
     }
+}
