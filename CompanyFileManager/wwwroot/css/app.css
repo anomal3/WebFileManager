@@ -1,0 +1,116 @@
+html, body {
+    font-family: 'Roboto', sans-serif;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0,0,0,0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+.file-preview-content {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 16px;
+    border-radius: 4px;
+    max-height: 65vh;
+    overflow-y: auto;
+    line-height: 1.6;
+}
+
+.file-row {
+    transition: background-color 0.15s ease;
+}
+
+.file-row:hover {
+    background-color: rgba(25, 118, 210, 0.06);
+    cursor: pointer;
+}
+
+.search-result-path {
+    font-size: 0.72rem;
+    opacity: 0.55;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 400px;
+}
+
+.file-icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.setup-card {
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.link-box {
+    background: rgba(25, 118, 210, 0.07);
+    border: 1px solid rgba(25, 118, 210, 0.28);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-family: monospace;
+    font-size: 1.05rem;
+    word-break: break-all;
+    letter-spacing: 0.01em;
+}
+
+.tree-scroll {
+    overflow-y: auto;
+    height: calc(100vh - 140px);
+}
+
+.content-scroll {
+    overflow-y: auto;
+    height: calc(100vh - 140px);
+}
+
+.breadcrumb-path {
+    font-size: 0.8rem;
+    opacity: 0.6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.upload-zone {
+    border: 2px dashed rgba(25, 118, 210, 0.4);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.upload-zone:hover {
+    border-color: #1976D2;
+    background: rgba(25, 118, 210, 0.04);
+}
+
+.drag-active {
+    outline: 3px dashed #1976D2;
+    outline-offset: -3px;
+    background: rgba(25, 118, 210, 0.06) !important;
+}

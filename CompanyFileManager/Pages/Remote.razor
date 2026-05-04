@@ -1,0 +1,177 @@
+@page "/remote"
+@implements IAsyncDisposable
+@inject AppSettingsService SettingsService
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<PageTitle>Удалённое управление — WebFileManager</PageTitle>
+
+<HeadContent>
+    <style>
+        .remote-host {
+            position: fixed;
+            top: 64px;
+            left: 0; right: 0; bottom: 0;
+            background: #000;
+            display: flex; flex-direction: column;
+            z-index: 1;
+            margin: 0 -16px;
+        }
+        .remote-host:fullscreen { top: 0; margin: 0; }
+        .remote-host:-webkit-full-screen { top: 0; margin: 0; }
+
+        .remote-toolbar {
+            background: rgba(20,20,20,0.95);
+            color: white;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .remote-host:fullscreen .remote-toolbar {
+            position: absolute;
+            top: 8px; left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity .25s;
+            border-radius: 8px;
+            padding: 6px 14px;
+            border: 1px solid rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            background: rgba(20,20,20,0.6);
+        }
+        .remote-host:fullscreen:hover .remote-toolbar { opacity: 0.95; }
+
+        .remote-canvas-wrap {
+            flex: 1;
+            position: relative;
+            background: #000;
+            overflow: hidden;
+            min-height: 0;
+        }
+        #remote-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            outline: none;
+            display: block;
+        }
+        .remote-host.session-active #remote-canvas { cursor: none; }
+
+        .remote-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg,#1a1a2e,#16213e);
+            color: white;
+        }
+    </style>
+</HeadContent>
+
+@if (!SettingsService.Settings.AllowRemoteControl)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-3">
+        Удалённое управление отключено. Включите его в настройках.
+    </MudAlert>
+    <MudButton Variant="Variant.Outlined" Href="/setup" StartIcon="@Icons.Material.Filled.Settings">
+        Открыть настройки
+    </MudButton>
+    return;
+}
+
+<div id="remote-host" class="remote-host @(_connected ? "session-active" : "")">
+    <div class="remote-toolbar">
+        <MudIcon Icon="@Icons.Material.Filled.DesktopWindows" Style="color:white" />
+        <MudText Typo="Typo.subtitle2" Style="color:white">Удалённое управление</MudText>
+
+        @if (!_connected)
+        {
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.PlayArrow"
+                       OnClick="Connect" Size="Size.Small">
+                Начать сеанс
+            </MudButton>
+        }
+        else
+        {
+            <MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Color="Color.Success" Size="Size.Small" />
+            <MudText Typo="Typo.caption" Style="color:#4caf50">Активен</MudText>
+            <MudSpacer />
+            <MudTooltip Text="Полный экран (Esc — выйти)">
+                <MudIconButton Icon="@Icons.Material.Filled.Fullscreen"
+                               Style="color:white"
+                               OnClick="ToggleFullscreen" Size="Size.Small" />
+            </MudTooltip>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.StopCircle" OnClick="Disconnect">
+                Завершить
+            </MudButton>
+        }
+    </div>
+
+    <div class="remote-canvas-wrap">
+        <canvas id="remote-canvas" tabindex="0"></canvas>
+        @if (!_connected)
+        {
+            <div class="remote-placeholder">
+                <div style="text-align:center">
+                    <MudIcon Icon="@Icons.Material.Filled.DesktopWindows"
+                             Style="font-size:5rem;opacity:.4;color:white" />
+                    <MudText Typo="Typo.h6" Style="opacity:.6;margin-top:12px;color:white">
+                        Нажмите «Начать сеанс»
+                    </MudText>
+                    <MudText Typo="Typo.caption" Style="opacity:.4;color:white">
+                        Мышь, клавиатура и колесо передаются на удалённый рабочий стол
+                    </MudText>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool _connected;
+
+    private async Task Connect()
+    {
+        _connected = true;
+        StateHasChanged();
+        await Task.Yield();
+        try
+        {
+            await JS.InvokeVoidAsync("RemoteDesktop.connect", "/hubs/remote", "remote-canvas", "remote-host");
+        }
+        catch (Exception ex)
+        {
+            _connected = false;
+            Snackbar.Add($"Ошибка подключения: {ex.Message}", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task Disconnect()
+    {
+        try { await JS.InvokeVoidAsync("RemoteDesktop.disconnect"); } catch { }
+        _connected = false;
+    }
+
+    private async Task ToggleFullscreen()
+    {
+        try { await JS.InvokeVoidAsync("RemoteDesktop.toggleFullscreen"); } catch { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_connected)
+        {
+            try { await JS.InvokeVoidAsync("RemoteDesktop.disconnect"); }
+            catch { }
+        }
+    }
+}

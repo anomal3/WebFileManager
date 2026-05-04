@@ -1,81 +1,113 @@
-﻿@inherits LayoutComponentBase
-@inject NavigationManager NavigationManager
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject AppSettingsService Settings
 
-<DxLayoutBreakpoint MaxWidth="1200"
-                    @bind-IsActive="@IsMobileLayout" />
+<MudThemeProvider @ref="_themeProvider" @bind-IsDarkMode="_isDark" Theme="_theme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
 
-<div class="page">
-    <DxGridLayout CssClass="page-layout">
-        <Rows>
-            @if(IsMobileLayout) {
-                <DxGridLayoutRow Areas="header" Height="auto"></DxGridLayoutRow>
-                <DxGridLayoutRow Areas="sidebar" Height="auto"></DxGridLayoutRow>
-                <DxGridLayoutRow Areas="content" />
-            }
-            else {
-                <DxGridLayoutRow Areas="header header" Height="auto" />
-                <DxGridLayoutRow Areas="@(IsSidebarExpanded ? "sidebar content" : "content content")" />
-            }
-        </Rows>
-        <Columns>
-            @if(!IsMobileLayout) {
-                <DxGridLayoutColumn Width="auto" />
-                <DxGridLayoutColumn />
-            }
-        </Columns>
-        <Items>
-            <DxGridLayoutItem Area="header" CssClass="layout-item">
-                <Template>
-                    <Header @bind-ToggleOn="@IsSidebarExpanded" />
-                </Template>
-            </DxGridLayoutItem>
-            <DxGridLayoutItem Area="sidebar" CssClass="layout-item">
-                <Template>
-                    <NavMenu StateCssClass="@NavMenuCssClass" />
-                </Template>
-            </DxGridLayoutItem>
-            <DxGridLayoutItem Area="content" CssClass="content px-4 layout-item">
-                <Template>
-                    @Body
-                </Template>
-            </DxGridLayoutItem>
-        </Items>
-    </DxGridLayout>
-    </div>
+<MudLayout>
+    <MudAppBar Elevation="2" Color="Color.Dark" Dense="false">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="ToggleDrawer" />
+        <MudIcon Icon="@Icons.Material.Filled.FolderSpecial" Class="ml-2 mr-1" />
+        <MudText Typo="Typo.h6">WebFileManager</MudText>
+        <MudSpacer />
+        <MudTooltip Text="@(_isDark ? "Светлая тема" : "Тёмная тема")">
+            <MudIconButton Icon="@(_isDark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                           Color="Color.Inherit" OnClick="ToggleTheme" />
+        </MudTooltip>
+        @if (IsAdmin)
+        {
+            <MudTooltip Text="Настройки сервера">
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Color="Color.Inherit" Href="/setup" />
+            </MudTooltip>
+        }
+    </MudAppBar>
 
-@code{
-    string? NavMenuCssClass { get; set; }
-    bool _isMobileLayout;
-    bool IsMobileLayout {
-        get => _isMobileLayout;
-        set {
-            _isMobileLayout = value;
-            IsSidebarExpanded = !_isMobileLayout;
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="2"
+               Variant="DrawerVariant.Responsive"
+               ClipMode="DrawerClipMode.Always">
+        <MudDrawerHeader>
+            <MudText Typo="Typo.subtitle2" Class="mt-1 text-uppercase" Style="opacity:.6; letter-spacing:.08em">
+                Навигация
+            </MudText>
+        </MudDrawerHeader>
+        <MudNavMenu>
+            <MudNavLink Href="/" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.FolderOpen">
+                Файловый менеджер
+            </MudNavLink>
+            @if (Settings.Settings.AllowRemoteControl)
+            {
+                <MudNavLink Href="/remote"
+                            Icon="@Icons.Material.Filled.DesktopWindows">
+                    Удалённое управление
+                </MudNavLink>
+            }
+            @if (IsAdmin)
+            {
+                <MudDivider Class="my-1" />
+                <MudNavLink Href="/setup" Icon="@Icons.Material.Filled.Tune">
+                    Настройки
+                </MudNavLink>
+            }
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="pa-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    MudThemeProvider _themeProvider = default!;
+    bool _drawerOpen = true;
+    bool _isDark;
+
+    bool IsAdmin => Nav.BaseUri.Contains("localhost", StringComparison.OrdinalIgnoreCase)
+                 || Nav.BaseUri.Contains("127.0.0.1");
+
+    private readonly MudTheme _theme = new()
+    {
+        Palette = new PaletteLight
+        {
+            Primary = "#1976D2",
+            AppbarBackground = "#212121",
+            Background = "#f5f5f5",
+            Surface = "#ffffff",
+            DrawerBackground = "#fafafa",
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#42A5F5",
+            Background = "#121212",
+            Surface = "#1e1e1e",
+            DrawerBackground = "#181818",
+            AppbarBackground = "#0d0d0d",
+        }
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var saved = await JS.InvokeAsync<string?>("getLocalStorage", "wfm-theme");
+            _isDark = saved == "dark";
+            StateHasChanged();
         }
     }
 
-    bool _isSidebarExpanded = true;
-    bool IsSidebarExpanded {
-        get => _isSidebarExpanded;
-        set {
-            if(_isSidebarExpanded != value) {
-                NavMenuCssClass = value ? "expand" : "collapse";
-                _isSidebarExpanded = value;
-            }
-        }
+    async Task ToggleTheme()
+    {
+        _isDark = !_isDark;
+        await JS.InvokeVoidAsync("setLocalStorage", "wfm-theme", _isDark ? "dark" : "light");
     }
 
-    protected override void OnInitialized() {
-        NavigationManager.LocationChanged += OnLocationChanged;
-    }
-    async void OnLocationChanged(object? sender, LocationChangedEventArgs args) {
-        if(IsMobileLayout) {
-            IsSidebarExpanded = false;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    public void Dispose() {
-        NavigationManager.LocationChanged -= OnLocationChanged;
-    }
+    void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 }

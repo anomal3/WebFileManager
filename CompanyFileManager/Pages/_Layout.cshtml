@@ -1,45 +1,32 @@
-﻿@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Web
 @namespace CompanyFileManager.Pages
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="~/" />
-    <link href="_content/DevExpress.Blazor.Themes/blazing-dark.bs5.css" rel="stylesheet" />
-
-    <link href="~/css/site.css" rel="stylesheet" />
-    <link href="CompanyFileManager.styles.css" rel="stylesheet" />
+    <title>WebFileManager</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="~/css/app.css" rel="stylesheet" />
     <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
-    <link href="_content/DevExpress.Blazor.RichEdit/dx-blazor-richedit.bs5.css" rel="stylesheet" />
 </head>
 <body>
-    @{
-        var isIEOrEdgeLegacy = Context.Request.Headers["User-Agent"]
-            .Any(userAgent => userAgent.Contains("MSIE") || userAgent.Contains("Trident") || userAgent.Contains("Edge/"));
-    }
-    @if(isIEOrEdgeLegacy)
-    {
-        <component type="typeof(CompanyFileManager.Shared.BrowserNotSupported)" render-mode="Static" />
-    }
-    else
-    {
-        @RenderBody()
+    @RenderBody()
 
-        <div id="blazor-error-ui">
-            <environment include="Staging,Production">
-                An error has occurred. This application may no longer respond until reloaded.
-            </environment>
-            <environment include="Development">
-                An unhandled exception has occurred. See browser dev tools for details.
-            </environment>
-            <a href="" class="reload">Reload</a>
-            <a class="dismiss">🗙</a>
-        </div>
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">&#10006;</a>
+    </div>
 
-        <script src="_framework/blazor.server.js"></script>
-    }
+    <script src="_framework/blazor.server.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="~/js/signalr.min.js"></script>
+    <script src="~/js/app.js"></script>
+    <script src="~/js/remote.js"></script>
 </body>
 </html>

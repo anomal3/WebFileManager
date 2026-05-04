@@ -1,0 +1,40 @@
+@inject FileService FileService
+
+<MudTreeViewItem Expanded="Node.IsExpanded"
+                 Value="Node"
+                 Text="@Node.Name"
+                 Icon="@Icons.Material.Filled.Folder"
+                 IconColor="Color.Warning"
+                 ExpandedChanged="HandleExpand"
+                 OnClick="HandleClick">
+    @if (Node.IsExpanded)
+    {
+        @foreach (var child in Node.Children.Where(c => c.IsDirectory))
+        {
+            <FileTreeItem Node="@child" OnNodeClicked="OnNodeClicked" />
+        }
+    }
+</MudTreeViewItem>
+
+@code {
+    [Parameter, EditorRequired] public FileNode Node { get; set; } = default!;
+    [Parameter] public EventCallback<FileNode> OnNodeClicked { get; set; }
+
+    private async Task HandleClick()
+    {
+        await OnNodeClicked.InvokeAsync(Node);
+    }
+
+    private async Task HandleExpand(bool expanded)
+    {
+        Node.IsExpanded = expanded;
+        if (expanded && Node.Children.Count == 0)
+        {
+            Node.Children = FileService.GetChildren(Node.Path)
+                .Where(c => c.IsDirectory)
+                .ToList();
+        }
+        if (expanded)
+            await OnNodeClicked.InvokeAsync(Node);
+    }
+}

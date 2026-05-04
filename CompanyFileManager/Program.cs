@@ -1,38 +1,44 @@
-using CompanyFileManager.Data;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
+using CompanyFileManager.Hubs;
+using CompanyFileManager.Services;
+using MudBlazor.Services;
 
-Data.InitDirectory();
+var settingsService = new AppSettingsService();
+settingsService.Load();
+
+var port = settingsService.Settings.Port;
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+builder.WebHost.ConfigureKestrel(options => options.ListenAnyIP(port));
+
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
-builder.Services.AddDevExpressBlazor(options => {
-    options.BootstrapVersion = DevExpress.Blazor.BootstrapVersion.v5;
-    options.SizeMode = DevExpress.Blazor.SizeMode.Medium;
-});
-builder.Services.AddSingleton<WeatherForecastService>();
+builder.Services.AddSignalR(o => { o.MaximumReceiveMessageSize = 10 * 1024 * 1024; });
+builder.Services.AddMudServices();
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddSingleton(settingsService);
+builder.Services.AddSingleton(new ServerInfo { LivePort = port });
+builder.Services.AddSingleton<FileService>();
+builder.Services.AddSingleton<NetworkService>();
+builder.Services.AddSingleton<InputSimulatorService>();
+builder.Services.AddSingleton<ScreenCaptureService>();
+builder.Services.AddSingleton<RestartService>();
+
+builder.Services.AddControllers();
+
 builder.WebHost.UseWebRoot("wwwroot");
 builder.WebHost.UseStaticWebAssets();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
-{
     app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-}
-app.UseHttpsRedirection();
 
 app.UseStaticFiles();
-
 app.UseRouting();
 
 app.MapControllers();
-
+app.MapHub<ScreenShareHub>("/hubs/remote");
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 

@@ -1,46 +1,139 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using CompanyFileManager.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace CompanyFileManager.Controllers
 {
-    [Route("[controller]")]
-    public class FileController : Controller
+    [ApiController]
+    [Route("api/[controller]")]
+    public class FileController : ControllerBase
     {
-        private IWebHostEnvironment _hostingEnvironment;
-        public FileController(IWebHostEnvironment environment)
-        {
-            _hostingEnvironment = environment;
-        }
+        private readonly AppSettingsService _settings;
 
-        public IActionResult Index()
+        public FileController(AppSettingsService settings)
         {
-            return Content("HELLO");
+            _settings = settings;
         }
-
-        protected internal string Hello() => "Hello ASP.NET";
 
         [HttpGet("download")]
-        [Route("[action]")]
-        public IActionResult GetBlobDownload([FromQuery] string link)
+        public IActionResult Download([FromQuery] string path)
         {
-            var net = new System.Net.WebClient();
-            var data = net.DownloadData(link);
-            var content = new System.IO.MemoryStream(data);
-            var contentType = "APPLICATION/octet-stream";
-            var fileName = Path.GetFileName(link);
-            return File(content, contentType, fileName);
+            if (string.IsNullOrWhiteSpace(path))
+                return BadRequest("Path is required");
+
+            if (!IsPathAllowed(path))
+                return Forbid();
+
+            if (!System.IO.File.Exists(path))
+                return NotFound();
+
+            try
+            {
+                var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                var contentType = GetContentType(path);
+                var fileName = System.IO.Path.GetFileName(path);
+                return File(stream, contentType, fileName);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return StatusCode(403, "Access denied");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
         }
 
-        [HttpGet]
-        public IActionResult DownloadFile([FromQuery] string link)
+        [HttpGet("preview")]
+        public async Task<IActionResult> Preview([FromQuery] string path)
         {
-            // Since this is just and example, I am using a local file located inside wwwroot
-            // Afterwards file is converted into a stream
-            var path = Path.Combine(_hostingEnvironment.WebRootPath, link);
-            var fs = new FileStream(path, FileMode.Open);
+            if (string.IsNullOrWhiteSpace(path))
+                return BadRequest();
 
-            // Return the file. A byte array can also be used instead of a stream
-            return File(fs, "application/octet-stream", "Sample.xlsx");
+            if (!IsPathAllowed(path))
+                return Forbid();
+
+            if (!System.IO.File.Exists(path))
+                return NotFound();
+
+            try
+            {
+                var content = await System.IO.File.ReadAllTextAsync(path);
+                return Content(content, "text/plain; charset=utf-8");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return StatusCode(403, "Access denied");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
         }
 
+        [HttpPost("upload")]
+        public async Task<IActionResult> Upload([FromQuery] string directory, IFormFile file)
+        {
+            if (!_settings.Settings.AllowUpload)
+                return StatusCode(403, "Upload is disabled by server settings");
+
+            if (string.IsNullOrWhiteSpace(directory) || file == null || file.Length == 0)
+                return BadRequest();
+
+            if (!IsPathAllowed(directory))
+                return Forbid();
+
+            if (!Directory.Exists(directory))
+                return NotFound("Directory not found");
+
+            try
+            {
+                var fileName = System.IO.Path.GetFileName(file.FileName);
+                var destPath = System.IO.Path.Combine(directory, fileName);
+
+                await using var stream = new FileStream(destPath, FileMode.Create);
+                await file.CopyToAsync(stream);
+
+                return Ok(new { path = destPath, name = fileName });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return StatusCode(403, "Access denied");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        private bool IsPathAllowed(string path)
+        {
+            var root = _settings.Settings.SharedDirectory;
+            if (string.IsNullOrEmpty(root)) return false;
+            try
+            {
+                var fullPath = System.IO.Path.GetFullPath(path);
+                var fullRoot = System.IO.Path.GetFullPath(root);
+                return fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        private static string GetContentType(string path)
+        {
+            var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+            return ext switch
+            {
+                ".pdf" => "application/pdf",
+                ".txt" or ".log" or ".ini" or ".conf" or ".csv" or ".md" => "text/plain; charset=utf-8",
+                ".json" => "application/json",
+                ".xml" => "application/xml",
+                ".png" => "image/png",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".gif" => "image/gif",
+                ".svg" => "image/svg+xml",
+                ".mp4" => "video/mp4",
+                _ => "application/octet-stream"
+            };
+        }
     }
 }

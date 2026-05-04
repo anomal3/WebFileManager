@@ -1,113 +1,507 @@
-﻿@page "/"
-@using Data
-@using Microsoft.AspNetCore.Components
-@using System.Diagnostics.Tracing
+@page "/"
+@implements IAsyncDisposable
+@inject AppSettingsService SettingsService
+@inject FileService FileService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject IJSRuntime JS
 
-<h2 class="pb-2">Сетевой диск</h2>
-<p class="pb-2 mw-1100">
-    Web версия сетевого диска
-</p>
+<PageTitle>Файлы — WebFileManager</PageTitle>
 
-<p class="demo-text cw-320 mt-2">
-    Размер значков
-</p>
-<DxSpinEdit @bind-Value="@SizeIcon" SizeMode="SizeMode.Small" NullText="Введите размер..." CssClass="cw-320" />
+@if (!SettingsService.Settings.IsConfigured)
+{
+    <MudAlert Severity="Severity.Info" Class="mb-3">
+        Сервер не настроен.
+        <MudLink Href="/setup">Открыть настройки</MudLink>
+    </MudAlert>
+}
 
-
-<br />
-
-<style>
-    .icons-style {
-        width: @(SizeIcon)px;
+<!-- TOOLBAR -->
+<MudPaper Elevation="0" Class="d-flex align-center gap-2 mb-3 pa-0" Style="flex-wrap:wrap; background:transparent">
+    <MudTextField @bind-Value="_searchQuery"
+                  Placeholder="Поиск по всему каталогу..."
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Search"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Style="min-width:260px; flex:1"
+                  @onkeyup="OnSearchKeyUp"
+                  Clearable="true"
+                  OnClearButtonClick="ClearSearch" />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Search"
+               OnClick="StartSearch" Disabled="_isSearching">
+        Найти
+    </MudButton>
+    @if (_isSearching)
+    {
+        <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />
+        <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="CancelSearch" Size="Size.Small">
+            Стоп
+        </MudButton>
     }
-</style>
+</MudPaper>
 
-<!-- @oncontextmenu="((e) => ShowContextMenu(treeView.Data, e))" @oncontextmenu:preventDefault-->
-<div class="cw-320">
-    <DxTreeView ref="@treeView"
-                Data="@ApiFiles.ServerFiles"
-                @bind-FilterString="FilterString"
-                FilterMinLength="2"
-                ShowFilterPanel="true"
-                Target="_blank"
-                FilterMode="NavigationFilterMode.ParentBranch"
-                FilterNullText="Введите что хотите найти..."
-                AnimationType="LayoutAnimationType.Slide"
-                ShowExpandButtons="true"
-                NodeClick="@OnNodeClick" @oncontextmenu="((e) => { ShowContextMenu(null, e); })" >
+<!-- BREADCRUMB -->
+@if (_breadcrumbs.Count > 0)
+{
+    <MudBreadcrumbs Items="_breadcrumbs" Class="pa-0 mb-2" />
+}
 
-        <DataMappings>
-            <DxTreeViewDataMapping Key="Id" ParentKey="ParentId"
-                                   IconCssClass="Style"
-                                   Text="Name" IconUrl="Icon" NavigateUrl="NavigateUrl" /> <!--Enabled="enables"-->
-        </DataMappings>
-    </DxTreeView>
-</div>
+<MudGrid Spacing="2">
+    <!-- LEFT TREE PANEL -->
+    <MudItem xs="12" sm="4" md="3">
+        <MudPaper Elevation="1" Style="height:calc(100vh - 175px); overflow:hidden; border-right:1px solid rgba(0,0,0,0.08)">
+            <div style="height:100%; overflow-y:auto; overflow-x:hidden">
+                <MudTreeView T="FileNode" Dense="true" Hover="true">
+                    @foreach (var node in _treeRoots)
+                    {
+                        <FileTreeItem Node="@node" OnNodeClicked="OnTreeNodeClick" />
+                    }
+                </MudTreeView>
+            </div>
+        </MudPaper>
+    </MudItem>
 
-<!--CONTEXT MENU-->
-<DxContextMenu @ref="@ContextMenu" ItemClick="@OnItemClick">
-    <Items>
-        <DxContextMenuItem Text="Сортировать по"  IconCssClass="menu-icon-sort-by menu-icon">
-            <Items>
-                <DxContextMenuItem Text="Имени"></DxContextMenuItem>
-                <DxContextMenuItem Text="Размеру"></DxContextMenuItem>
-                <DxContextMenuItem Text="Типу"></DxContextMenuItem>
-            </Items>
-        </DxContextMenuItem>
-        <DxContextMenuItem Text="Копировать" IconCssClass="menu-icon-copy menu-icon" BeginGroup="true"></DxContextMenuItem>
-        <DxContextMenuItem Text="Вырезать" IconCssClass="menu-icon-cut menu-icon"></DxContextMenuItem>
-        <DxContextMenuItem Text="Удалить" IconCssClass="menu-icon-clear menu-icon"></DxContextMenuItem>
-        <DxContextMenuItem Text="Выбрать всё" BeginGroup="true"></DxContextMenuItem>
-    </Items>
-</DxContextMenu>
-<!--CONTEXT MENU-->
+    <!-- RIGHT CONTENT PANEL -->
+    <MudItem xs="12" sm="8" md="9">
+        <MudPaper Elevation="1"
+                  id="file-drop-zone"
+                  Style="height:calc(100vh - 175px); overflow-y:auto; position:relative"
+                  Class="@(_isDragging ? "drag-active" : "")">
+
+            <!-- UPLOAD ZONE (shown always when upload allowed) -->
+            @if (SettingsService.Settings.AllowUpload && _currentPath != null && !_isSearchMode)
+            {
+                <div class="upload-zone ma-2">
+                    <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Color="Color.Primary" Size="Size.Large" />
+                    <MudText Typo="Typo.body2" Color="Color.Primary" Class="mt-1">
+                        Перетащите файлы сюда или используйте кнопку
+                    </MudText>
+                    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                   OnFilesChanged="OnBrowserFilesSelected"
+                                   Multiple="true"
+                                   Class="mt-1">
+                        <ButtonTemplate>
+                            <MudButton HtmlTag="label"
+                                       Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.AttachFile"
+                                       Size="Size.Small"
+                                       for="@context">
+                                Выбрать файлы
+                            </MudButton>
+                        </ButtonTemplate>
+                    </MudFileUpload>
+                </div>
+                @if (_uploadProgress > 0)
+                {
+                    <MudProgressLinear Value="_uploadProgress" Color="Color.Primary" Class="mx-2 mb-1" />
+                }
+            }
+
+            <!-- SEARCH RESULTS -->
+            @if (_isSearchMode)
+            {
+                <div class="pa-3 d-flex align-center gap-2">
+                    <MudText Typo="Typo.subtitle2">
+                        «@_lastQuery» — @_searchResults.Count результатов
+                    </MudText>
+                    @if (_isSearching)
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Info">поиск...</MudChip>
+                    }
+                </div>
+
+                @if (_searchResults.Count == 0 && !_isSearching)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4">Ничего не найдено</MudText>
+                }
+
+                <MudList Dense="true" Clickable="true">
+                    @foreach (var node in _searchResults)
+                    {
+                        <MudListItem Class="file-row" OnClick="@(() => OnFileClick(node))">
+                            <div class="d-flex align-center gap-2">
+                                @if (node.IsDirectory)
+                                { <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Warning" Size="Size.Small" /> }
+                                else
+                                { <img src="@node.Icon" class="file-icon" alt="" /> }
+                                <div style="flex:1; min-width:0">
+                                    <MudText Typo="Typo.body2" Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                                        @node.Name
+                                    </MudText>
+                                    <div class="search-result-path">@node.Path</div>
+                                </div>
+                                @if (!node.IsDirectory)
+                                {
+                                    <MudText Typo="Typo.caption" Class="text-nowrap mr-1">
+                                        @FileService.FormatFileSize(node.Size)
+                                    </MudText>
+                                    @if (FileService.IsTextFile(node.Path))
+                                    {
+                                        <div @onclick:stopPropagation="true">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                                           Size="Size.Small" Color="Color.Secondary"
+                                                           OnClick="@(() => PreviewFile(node))" />
+                                        </div>
+                                    }
+                                    <div @onclick:stopPropagation="true">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                       Size="Size.Small" Color="Color.Primary"
+                                                       OnClick="@(() => DownloadFile(node))" />
+                                    </div>
+                                }
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+            else
+            {
+                @if (_currentNodes.Count == 0 && _currentPath != null)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4">
+                        Папка пуста или нет доступа
+                    </MudText>
+                }
+                <MudList Dense="true" Clickable="true">
+                    @foreach (var node in _currentNodes)
+                    {
+                        <MudListItem Class="file-row" OnClick="@(() => OnFileClick(node))">
+                            <div class="d-flex align-center gap-2">
+                                @if (node.IsDirectory)
+                                { <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Warning" /> }
+                                else
+                                { <img src="@node.Icon" class="file-icon" alt="" /> }
+                                <div style="flex:1; min-width:0">
+                                    <MudText Typo="Typo.body2" Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                                        @node.Name
+                                    </MudText>
+                                    @if (!node.IsDirectory)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @FileService.FormatFileSize(node.Size) · @node.Modified.ToString("dd.MM.yyyy HH:mm")
+                                        </MudText>
+                                    }
+                                </div>
+                                @if (!node.IsDirectory)
+                                {
+                                    <div class="d-flex align-center">
+                                        @if (FileService.IsTextFile(node.Path))
+                                        {
+                                            <div @onclick:stopPropagation="true">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                                               Size="Size.Small" Color="Color.Secondary"
+                                                               Title="Просмотр"
+                                                               OnClick="@(() => PreviewFile(node))" />
+                                            </div>
+                                        }
+                                        <div @onclick:stopPropagation="true">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                           Size="Size.Small" Color="Color.Primary"
+                                                           Title="Скачать"
+                                                           OnClick="@(() => DownloadFile(node))" />
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- PREVIEW OVERLAY -->
+@if (_previewOpen)
+{
+    <MudOverlay Visible="true" DarkBackground="true" ZIndex="9999" OnClick="ClosePreview">
+        <MudPaper Style="width:min(900px,95vw); max-height:90vh; overflow:hidden; display:flex; flex-direction:column"
+                  Elevation="8" @onclick:stopPropagation="true">
+            <div class="d-flex align-center pa-3" style="border-bottom:1px solid rgba(128,128,128,0.2)">
+                <MudIcon Icon="@Icons.Material.Filled.Article" Class="mr-2" />
+                <MudText Typo="Typo.h6" Style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
+                    @_previewFileName
+                </MudText>
+                <div @onclick:stopPropagation="true">
+                    <MudIconButton Icon="@Icons.Material.Filled.Download" Color="Color.Primary"
+                                   OnClick="@(() => DownloadFile(_previewNode!))" />
+                </div>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="ClosePreview" />
+            </div>
+            <div style="flex:1; overflow-y:auto">
+                @if (_isLoadingPreview)
+                {
+                    <div class="d-flex justify-center pa-8">
+                        <MudProgressCircular Indeterminate="true" />
+                    </div>
+                }
+                else if (_previewContent != null)
+                {
+                    <pre class="file-preview-content" style="margin:0; border-radius:0">@_previewContent</pre>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Error" Class="ma-3">Не удалось загрузить содержимое</MudAlert>
+                }
+            </div>
+        </MudPaper>
+    </MudOverlay>
+}
 
 @code {
+    private List<FileNode> _treeRoots = new();
+    private List<FileNode> _currentNodes = new();
+    private List<FileNode> _searchResults = new();
+    private string? _currentPath;
+    private string _searchQuery = "";
+    private string _lastQuery = "";
+    private bool _isSearchMode;
+    private bool _isSearching;
+    private bool _isDragging;
+    private CancellationTokenSource? _searchCts;
 
-    protected Int32 SizeIcon { get; set; } = 36;
+    private bool _previewOpen;
+    private bool _isLoadingPreview;
+    private string? _previewContent;
+    private string _previewFileName = "";
+    private FileNode? _previewNode;
+    private int _uploadProgress;
 
+    private List<BreadcrumbItem> _breadcrumbs = new();
+    private DotNetObjectReference<Index>? _selfRef;
 
-    string FilterString = "";
-    DxTreeView treeView;
-
-    DxContextMenu? ContextMenu { get; set; }
-    string ClickedItem { get; set; }
-
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        ApiFiles.Initialize(Data.path);
+        var root = SettingsService.Settings.SharedDirectory;
+        if (!string.IsNullOrEmpty(root) && Directory.Exists(root))
+            LoadDirectory(root, initial: true);
     }
 
-    async Task ShowContextMenu(object obj, MouseEventArgs e)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        ContextMenu.ShowAsync(e);
-        if(obj != null) Console.WriteLine(obj);
-    }
-
-    private void OnExpanedChanged(TreeViewNodeCancelEventArgs obj)
-    {
-        Console.WriteLine(obj.NodeInfo.Name);
-    }
-
-    private async void OnNodeClick(TreeViewNodeClickEventArgs obj)
-    {
-        var _click_obj = ApiFiles.ServerFiles.FirstOrDefault(n => n.Name == obj.NodeInfo.Text).Id;
-
-        if (obj.NodeInfo.Text == "App_Data") return;
-
-        if (obj.MouseEventArgs.Button == 2)
+        if (firstRender && SettingsService.Settings.AllowUpload && _currentPath != null)
         {
-            ShowContextMenu(obj.NodeInfo.Text, new MouseEventArgs());
+            _selfRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initDragDrop", "file-drop-zone", _selfRef);
+        }
+    }
+
+    private void LoadDirectory(string path, bool initial = false)
+    {
+        _currentPath = path;
+        _currentNodes = FileService.GetChildren(path);
+        if (initial) _treeRoots = _currentNodes.Where(n => n.IsDirectory).ToList();
+        UpdateBreadcrumbs(path);
+    }
+
+    private void OnTreeNodeClick(FileNode node)
+    {
+        _isSearchMode = false;
+        _currentPath = node.Path;
+        _currentNodes = FileService.GetChildren(node.Path);
+        UpdateBreadcrumbs(node.Path);
+        StateHasChanged();
+    }
+
+    private void OnFileClick(FileNode node)
+    {
+        if (node.IsDirectory)
+        {
+            _isSearchMode = false;
+            _currentPath = node.Path;
+            _currentNodes = FileService.GetChildren(node.Path);
+
+            var treeNode = FindInTree(_treeRoots, node.Path);
+            if (treeNode != null)
+            {
+                treeNode.IsExpanded = true;
+                if (treeNode.Children.Count == 0)
+                    treeNode.Children = FileService.GetChildren(treeNode.Path)
+                        .Where(c => c.IsDirectory).ToList();
+            }
+
+            UpdateBreadcrumbs(node.Path);
+            StateHasChanged();
+        }
+        else if (FileService.IsTextFile(node.Path))
+        {
+            _ = PreviewFile(node);
+        }
+        else
+        {
+            _ = DownloadFile(node);
+        }
+    }
+
+    private FileNode? FindInTree(List<FileNode> nodes, string path)
+    {
+        foreach (var n in nodes)
+        {
+            if (string.Equals(n.Path, path, StringComparison.OrdinalIgnoreCase)) return n;
+            var f = FindInTree(n.Children, path);
+            if (f != null) return f;
+        }
+        return null;
+    }
+
+    private void UpdateBreadcrumbs(string path)
+    {
+        _breadcrumbs.Clear();
+        var root = SettingsService.Settings.SharedDirectory;
+        if (string.IsNullOrEmpty(root)) return;
+
+        _breadcrumbs.Add(new BreadcrumbItem("Корень", null, false, Icons.Material.Filled.Home));
+        try
+        {
+            var rootN = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
+            var pathN = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
+            if (string.Equals(rootN, pathN, StringComparison.OrdinalIgnoreCase)) return;
+            var rel = pathN.Substring(rootN.Length).TrimStart(Path.DirectorySeparatorChar);
+            foreach (var part in rel.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+                _breadcrumbs.Add(new BreadcrumbItem(part, null, false));
+        }
+        catch { }
+    }
+
+    private async Task StartSearch()
+    {
+        var q = _searchQuery.Trim();
+        if (q.Length < 2) { Snackbar.Add("Минимум 2 символа", Severity.Info); return; }
+
+        CancelSearch();
+        _searchCts = new CancellationTokenSource();
+        _searchResults.Clear();
+        _isSearchMode = true;
+        _isSearching = true;
+        _lastQuery = q;
+        StateHasChanged();
+
+        var root = SettingsService.Settings.SharedDirectory;
+        try
+        {
+            await foreach (var n in FileService.SearchAsync(q, root, _searchCts.Token))
+            {
+                _searchResults.Add(n);
+                if (_searchResults.Count % 25 == 0) StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { Snackbar.Add($"Ошибка поиска: {ex.Message}", Severity.Error); }
+
+        _isSearching = false;
+        StateHasChanged();
+    }
+
+    private void CancelSearch()
+    {
+        _searchCts?.Cancel(); _searchCts?.Dispose(); _searchCts = null; _isSearching = false;
+    }
+
+    private void ClearSearch()
+    {
+        CancelSearch(); _searchQuery = ""; _isSearchMode = false; _searchResults.Clear(); StateHasChanged();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await StartSearch();
+        if (e.Key == "Escape") ClearSearch();
+    }
+
+    private async Task PreviewFile(FileNode node)
+    {
+        _previewNode = node;
+        _previewFileName = node.Name;
+        _previewContent = null;
+        _isLoadingPreview = true;
+        _previewOpen = true;
+        StateHasChanged();
+        _previewContent = await FileService.GetPreviewContentAsync(node.Path);
+        _isLoadingPreview = false;
+        StateHasChanged();
+    }
+
+    private void ClosePreview() { _previewOpen = false; StateHasChanged(); }
+
+    private async Task DownloadFile(FileNode node) =>
+        await JS.InvokeVoidAsync("open", $"/api/file/download?path={Uri.EscapeDataString(node.Path)}", "_blank");
+
+    // MudFileUpload handler
+    private async Task OnBrowserFilesSelected(InputFileChangeEventArgs e)
+    {
+        if (_currentPath == null) return;
+        var files = e.GetMultipleFiles(50);
+        _uploadProgress = 1;
+        StateHasChanged();
+        int done = 0;
+
+        foreach (var file in files)
+        {
+            try
+            {
+                using var ms = new MemoryStream();
+                using var s = file.OpenReadStream(512L * 1024 * 1024);
+                await s.CopyToAsync(ms);
+                ms.Position = 0;
+
+                using var form = new MultipartFormDataContent();
+                form.Add(new StreamContent(ms), "file", file.Name);
+
+                using var http = new HttpClient();
+                var resp = await http.PostAsync(
+                    $"{Nav.BaseUri}api/file/upload?directory={Uri.EscapeDataString(_currentPath)}", form);
+
+                Snackbar.Add(resp.IsSuccessStatusCode ? $"Загружен: {file.Name}" : $"Ошибка: {file.Name}",
+                    resp.IsSuccessStatusCode ? Severity.Success : Severity.Error);
+            }
+            catch (Exception ex) { Snackbar.Add($"Ошибка: {file.Name} — {ex.Message}", Severity.Error); }
+
+            _uploadProgress = (int)(++done * 100.0 / files.Count);
+            StateHasChanged();
         }
 
-        if (Directory.Exists(_click_obj)) ApiFiles.SubDir(_click_obj);
-        else Console.WriteLine("Тык");
-
+        _uploadProgress = 0;
+        _currentNodes = FileService.GetChildren(_currentPath);
+        StateHasChanged();
     }
 
+    // Drag & Drop JS interop callbacks
+    [JSInvokable]
+    public void OnDropFile(string name, long size) => _isDragging = false;
 
-    void OnItemClick(ContextMenuItemClickEventArgs args)
+    [JSInvokable]
+    public async Task OnDropComplete(int count)
     {
-        ClickedItem = args.ItemInfo.Text;
+        _isDragging = false;
+        if (_currentPath == null) return;
+
+        var uploadUrl = $"{Nav.BaseUri}api/file/upload?directory={Uri.EscapeDataString(_currentPath)}";
+        var json = await JS.InvokeAsync<string>("uploadDroppedFiles", uploadUrl);
+
+        try
+        {
+            var results = System.Text.Json.JsonSerializer.Deserialize<List<UploadResult>>(json);
+            foreach (var r in results ?? new())
+                Snackbar.Add(r.ok ? $"Загружен: {r.name}" : $"Ошибка: {r.name}", r.ok ? Severity.Success : Severity.Error);
+        }
+        catch { }
+
+        _currentNodes = FileService.GetChildren(_currentPath);
+        StateHasChanged();
+    }
+
+    private record UploadResult(string name, bool ok, int status);
+
+    public async ValueTask DisposeAsync()
+    {
+        CancelSearch();
+        if (_selfRef != null)
+        {
+            try { await JS.InvokeVoidAsync("destroyDragDrop", "file-drop-zone"); } catch { }
+            _selfRef.Dispose();
+        }
     }
 }

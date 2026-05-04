@@ -1,11 +1,11 @@
-﻿<div class="sidebar @StateCssClass">
-<DxTreeView AllowSelectNodes="true" CssClass="app-sidebar">
-    <Nodes>
-        <DxTreeViewNode NavigateUrl="./" Text="Сетевой диск"></DxTreeViewNode>
-        <DxTreeViewNode NavigateUrl="grid" Text="Выгрузить изменения"></DxTreeViewNode>
-    </Nodes>
-</DxTreeView>
-</div>
+<MudNavMenu>
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.FolderOpen">
+        Файловый браузер
+    </MudNavLink>
+    <MudNavLink Href="/setup" Icon="@Icons.Material.Filled.Settings">
+        Настройки сервера
+    </MudNavLink>
+</MudNavMenu>
 
 @code {
     [Parameter] public string? StateCssClass { get; set; }

@@ -17,9 +17,8 @@ namespace CompanyFileManager.Data
             //{
             //    Console.WriteLine("LINUXA");
             //}
-            var execute = Assembly.GetExecutingAssembly().Location;
-            execute = execute.Substring(0, execute.LastIndexOf("\\"));
-            try { path = File.ReadAllText(execute + @"\sharedirectory.txt"); }
+            var execute = AppContext.BaseDirectory;
+            try { path = File.ReadAllText(Path.Combine(execute, "sharedirectory.txt")); }
             catch (Exception ex) { Console.WriteLine(ex.Message); path = "C:\\"; }
         }
     }

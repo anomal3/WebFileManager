@@ -1,0 +1,163 @@
+@inject FileService FileService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Class="mr-2" Style="vertical-align:middle" />
+            Выбор папки
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_selectedPath"
+                      Label="Путь"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      Class="mb-3"
+                      ReadOnly="true" />
+
+        <!-- Drive selector -->
+        <div class="d-flex gap-1 flex-wrap mb-2">
+            @foreach (var drive in _drives)
+            {
+                <MudButton Variant="@(_currentRoot == drive ? Variant.Filled : Variant.Outlined)"
+                           Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Storage"
+                           OnClick="@(() => NavigateTo(drive))">
+                    @drive
+                </MudButton>
+            }
+        </div>
+
+        <!-- Breadcrumb -->
+        @if (_breadcrumbs.Count > 0)
+        {
+            <MudBreadcrumbs Items="_breadcrumbs" Class="pa-0 mb-1 text-truncate" />
+        }
+
+        <!-- Folder list -->
+        <MudPaper Elevation="1" Style="height:300px; overflow-y:auto">
+            @if (_loading)
+            {
+                <div class="d-flex justify-center pa-4">
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                </div>
+            }
+            else
+            {
+                <MudList Dense="true" Clickable="true">
+                    @if (_parentPath != null)
+                    {
+                        <MudListItem OnClick="GoUp">
+                            <div class="d-flex align-center gap-2">
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" Color="Color.Secondary" />
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">..</MudText>
+                            </div>
+                        </MudListItem>
+                    }
+                    @foreach (var dir in _dirs)
+                    {
+                        <MudListItem OnClick="@(() => SelectAndNavigate(dir))">
+                            <div class="d-flex align-center gap-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Warning" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">@Path.GetFileName(dir)</MudText>
+                            </div>
+                        </MudListItem>
+                    }
+                    @if (_dirs.Count == 0 && _parentPath != null)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pa-3">
+                            Нет подпапок
+                        </MudText>
+                    }
+                </MudList>
+            }
+        </MudPaper>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Отмена</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="string.IsNullOrEmpty(_selectedPath)"
+                   OnClick="Confirm">
+            Выбрать
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string? InitialPath { get; set; }
+
+    private List<string> _drives = new();
+    private List<string> _dirs = new();
+    private List<BreadcrumbItem> _breadcrumbs = new();
+    private string? _selectedPath;
+    private string? _currentRoot;
+    private string? _parentPath;
+    private bool _loading;
+
+    protected override void OnInitialized()
+    {
+        _drives = DriveInfo.GetDrives()
+            .Where(d => d.IsReady)
+            .Select(d => d.Name)
+            .ToList();
+
+        var start = InitialPath ?? (Environment.OSVersion.Platform == PlatformID.Win32NT ? "C:\\" : "/");
+        NavigateTo(start);
+    }
+
+    private void NavigateTo(string path)
+    {
+        _loading = true;
+        _selectedPath = path;
+        _currentRoot = path;
+
+        try
+        {
+            _dirs = Directory.GetDirectories(path)
+                .OrderBy(d => Path.GetFileName(d))
+                .ToList();
+            _parentPath = Path.GetDirectoryName(path);
+            BuildBreadcrumbs(path);
+        }
+        catch
+        {
+            _dirs = new();
+        }
+        _loading = false;
+    }
+
+    private void SelectAndNavigate(string dir)
+    {
+        _selectedPath = dir;
+        NavigateTo(dir);
+    }
+
+    private void GoUp()
+    {
+        if (_parentPath != null) NavigateTo(_parentPath);
+    }
+
+    private void BuildBreadcrumbs(string path)
+    {
+        _breadcrumbs.Clear();
+        var parts = new List<string>();
+        var p = path;
+        while (!string.IsNullOrEmpty(p))
+        {
+            parts.Insert(0, p);
+            var parent = Path.GetDirectoryName(p);
+            if (parent == p) break;
+            p = parent ?? "";
+        }
+        foreach (var part in parts)
+        {
+            var name = Path.GetFileName(part);
+            if (string.IsNullOrEmpty(name)) name = part;
+            _breadcrumbs.Add(new BreadcrumbItem(name, null, false));
+        }
+    }
+
+    private void Confirm() => MudDialog.Close(DialogResult.Ok(_selectedPath));
+    private void Cancel() => MudDialog.Cancel();
+}

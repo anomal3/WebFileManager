@@ -1,0 +1,360 @@
+@page "/setup"
+@inject AppSettingsService SettingsService
+@inject NetworkService NetworkService
+@inject RestartService Restart
+@inject ServerInfo ServerInfo
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Настройки — WebFileManager</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-2">
+    <MudIcon Icon="@Icons.Material.Filled.Tune" Class="mr-2" Style="vertical-align:middle" />
+    Настройки сервера
+</MudText>
+
+<MudAlert Severity="Severity.Normal" Dense="true" Class="mb-4 setup-card">
+    <MudText Typo="Typo.body2">
+        Сервер сейчас слушает порт <b>@ServerInfo.LivePort</b>.
+        @if (_settings.Port != ServerInfo.LivePort && _settings.Port > 0)
+        {
+            <text> В настройках выбран <b>@_settings.Port</b> — для применения нужен перезапуск.</text>
+        }
+    </MudText>
+</MudAlert>
+
+<div class="setup-card">
+
+    <!-- DIRECTORY -->
+    <MudCard Class="mb-4" Elevation="2">
+        <MudCardHeader>
+            <CardHeaderAvatar><MudIcon Icon="@Icons.Material.Filled.FolderShared" Color="Color.Primary" /></CardHeaderAvatar>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Публикуемая директория</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Папка, доступная пользователям</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <div class="d-flex gap-2 align-center">
+                <MudTextField @bind-Value="_settings.SharedDirectory"
+                              Label="Путь к папке"
+                              Placeholder="C:\SharedFiles или \\server\share"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Folder"
+                              FullWidth="true"
+                              Variant="Variant.Outlined" />
+                <MudButton Variant="Variant.Outlined"
+                           StartIcon="@Icons.Material.Filled.DriveFileMove"
+                           OnClick="BrowseFolder"
+                           Style="min-width:120px; height:56px">
+                    Обзор...
+                </MudButton>
+            </div>
+            @if (!string.IsNullOrEmpty(_dirError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-2" Dense="true">@_dirError</MudAlert>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <!-- PERMISSIONS -->
+    <MudCard Class="mb-4" Elevation="2">
+        <MudCardHeader>
+            <CardHeaderAvatar><MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Primary" /></CardHeaderAvatar>
+            <CardHeaderContent><MudText Typo="Typo.h6">Права доступа</MudText></CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudSwitch @bind-Value="_settings.AllowUpload"
+                       Color="Color.Primary"
+                       Label="@(_settings.AllowUpload ? "Загрузка файлов разрешена" : "Только скачивание")" />
+            @if (_settings.AllowUpload)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                    Пользователи смогут загружать файлы в доступные директории
+                </MudAlert>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <!-- NETWORK -->
+    <MudCard Class="mb-4" Elevation="2">
+        <MudCardHeader>
+            <CardHeaderAvatar><MudIcon Icon="@Icons.Material.Filled.Router" Color="Color.Primary" /></CardHeaderAvatar>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Сеть и порт</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Kestrel слушает на всех интерфейсах (0.0.0.0)</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudNumericField @bind-Value="_settings.Port"
+                             Label="Порт"
+                             Min="1024" Max="65535"
+                             Variant="Variant.Outlined"
+                             Adornment="Adornment.Start"
+                             AdornmentIcon="@Icons.Material.Filled.Lan"
+                             Class="mb-3"
+                             Style="max-width:200px" />
+
+            <MudSwitch @bind-Value="_settings.EnableUpnp"
+                       Color="Color.Primary"
+                       Label="UPnP — автоматический проброс порта" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1 mb-3">
+                Работает с большинством домашних роутеров. Если не работает — пробросьте порт вручную.
+            </MudText>
+
+            <MudDivider Class="mb-3" />
+            <MudText Typo="Typo.subtitle2" Class="mb-2">DuckDNS (необязательно)</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">
+                Зарегистрируйтесь на duckdns.org для постоянного адреса при динамическом IP
+            </MudText>
+            <MudTextField @bind-Value="_settings.DuckDnsDomain"
+                          Label="Домен (myfiles.duckdns.org)"
+                          Variant="Variant.Outlined" FullWidth="true" Class="mb-2" />
+            <MudTextField @bind-Value="_settings.DuckDnsToken"
+                          Label="Токен DuckDNS"
+                          Variant="Variant.Outlined" FullWidth="true"
+                          InputType="InputType.Password" />
+        </MudCardContent>
+    </MudCard>
+
+    <!-- REMOTE CONTROL -->
+    <MudCard Class="mb-4" Elevation="2">
+        <MudCardHeader>
+            <CardHeaderAvatar><MudIcon Icon="@Icons.Material.Filled.DesktopWindows" Color="Color.Primary" /></CardHeaderAvatar>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Удалённое управление</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Просмотр и управление рабочим столом через браузер</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudSwitch @bind-Value="_settings.AllowRemoteControl"
+                       Color="Color.Warning"
+                       Label="@(_settings.AllowRemoteControl ? "Удалённое управление включено" : "Удалённое управление отключено")" />
+            @if (_settings.AllowRemoteControl)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2 mb-3">
+                    Пользователи с доступом смогут видеть и управлять вашим рабочим столом
+                </MudAlert>
+                <MudTextField @bind-Value="_settings.RemoteControlPassword"
+                              Label="Пароль доступа (необязательно)"
+                              InputType="InputType.Password"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              HelperText="Оставьте пустым для открытого доступа" />
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <!-- APPLY -->
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Size="Size.Large" FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.PlayArrow"
+                       OnClick="ApplySettings"
+                       Disabled="_isApplying">
+                @if (_isApplying)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Применяем...</span>
+                }
+                else { <span>Применить и получить ссылку</span> }
+            </MudButton>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- RESULT -->
+    @if (_showResult)
+    {
+        <MudCard Elevation="3" Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderAvatar><MudIcon Icon="@Icons.Material.Filled.Link" Color="Color.Success" /></CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6" Color="Color.Success">Сервер настроен!</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (!string.IsNullOrEmpty(_upnpMessage))
+                {
+                    <MudAlert Severity="@(_upnpSuccess ? Severity.Success : Severity.Warning)"
+                              Dense="true" Class="mb-3">@_upnpMessage</MudAlert>
+                }
+
+                @if (!string.IsNullOrEmpty(_publicLink))
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">Публичная ссылка:</MudText>
+                    <div class="link-box mb-2">@_publicLink</div>
+                    <div @onclick:stopPropagation="true">
+                        <MudButton StartIcon="@Icons.Material.Filled.ContentCopy"
+                                   Variant="Variant.Outlined" Size="Size.Small" Class="mr-2"
+                                   OnClick="@(() => CopyLink(_publicLink))">
+                            Копировать
+                        </MudButton>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(_localLink))
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Локальная сеть:</MudText>
+                    <div class="link-box mb-2">@_localLink</div>
+                    <div @onclick:stopPropagation="true">
+                        <MudButton StartIcon="@Icons.Material.Filled.ContentCopy"
+                                   Variant="Variant.Outlined" Size="Size.Small"
+                                   OnClick="@(() => CopyLink(_localLink))">
+                            Копировать
+                        </MudButton>
+                    </div>
+                }
+
+                @if (_portChanged)
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mt-3 mb-2">
+                        <MudText Typo="Typo.body2">
+                            <b>Порт изменён</b> с @_oldPort на @_settings.Port. Сейчас сервер всё ещё слушает порт @_oldPort.
+                            Нажмите «Перезапустить», чтобы применить новый порт.
+                        </MudText>
+                    </MudAlert>
+                    <div @onclick:stopPropagation="true">
+                        <MudButton Variant="Variant.Filled" Color="Color.Warning"
+                                   StartIcon="@Icons.Material.Filled.RestartAlt"
+                                   OnClick="DoRestart"
+                                   Disabled="_isRestarting">
+                            @if (_isRestarting)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <span>Перезапуск...</span>
+                            }
+                            else { <span>Перезапустить сервер</span> }
+                        </MudButton>
+                    </div>
+                }
+
+                <MudButton Href="/" Variant="Variant.Text" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.FolderOpen" Class="mt-3">
+                    Перейти к файлам
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    }
+
+</div>
+
+@code {
+    private AppSettings _settings = new();
+    private bool _isApplying, _showResult, _upnpSuccess, _portChanged, _isRestarting;
+    private int _oldPort;
+    private string _upnpMessage = "", _publicLink = "", _localLink = "", _dirError = "";
+
+    protected override void OnInitialized()
+    {
+        var s = SettingsService.Settings;
+        _settings = new AppSettings
+        {
+            SharedDirectory = s.SharedDirectory, AllowUpload = s.AllowUpload,
+            Port = s.Port, EnableUpnp = s.EnableUpnp,
+            DuckDnsToken = s.DuckDnsToken, DuckDnsDomain = s.DuckDnsDomain,
+            IsConfigured = s.IsConfigured, AllowRemoteControl = s.AllowRemoteControl,
+            RemoteControlPassword = s.RemoteControlPassword
+        };
+    }
+
+    private async Task BrowseFolder()
+    {
+        var opts = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+        var parms = new DialogParameters { ["InitialPath"] = _settings.SharedDirectory };
+        var dlg = await DialogService.ShowAsync<FolderPickerDialog>("Выбор папки", parms, opts);
+        var result = await dlg.Result;
+        if (!result.Canceled && result.Data is string path)
+            _settings.SharedDirectory = path;
+    }
+
+    private async Task ApplySettings()
+    {
+        _dirError = ""; _showResult = false;
+
+        if (string.IsNullOrWhiteSpace(_settings.SharedDirectory))
+        { _dirError = "Укажите путь к директории"; return; }
+
+        if (!Directory.Exists(_settings.SharedDirectory))
+        { _dirError = "Директория не существует или нет доступа"; return; }
+
+        _isApplying = true;
+        _oldPort = ServerInfo.LivePort;
+        _portChanged = _settings.Port != _oldPort;
+        _settings.IsConfigured = true;
+        SettingsService.UpdateAndSave(_settings);
+        NetworkService.ClearCachedIp();
+
+        if (_settings.EnableUpnp)
+        {
+            var (ok, msg) = await NetworkService.MapPortAsync(_settings.Port);
+            _upnpSuccess = ok; _upnpMessage = msg;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_settings.DuckDnsToken) && !string.IsNullOrWhiteSpace(_settings.DuckDnsDomain))
+            await UpdateDuckDns();
+
+        var publicIp = await NetworkService.GetPublicIpAsync();
+        if (!string.IsNullOrEmpty(publicIp))
+            _publicLink = NetworkService.BuildShareableLink(publicIp, _settings.Port);
+
+        var localIp = NetworkService.GetLocalIp();
+        if (!string.IsNullOrEmpty(localIp))
+            _localLink = NetworkService.BuildShareableLink(localIp, _settings.Port);
+
+        if (!string.IsNullOrWhiteSpace(_settings.DuckDnsDomain))
+        {
+            var d = _settings.DuckDnsDomain.Trim();
+            if (!d.Contains('.')) d += ".duckdns.org";
+            _publicLink = NetworkService.BuildShareableLink(d, _settings.Port);
+        }
+
+        _isApplying = false;
+        _showResult = true;
+        Snackbar.Add("Настройки сохранены", Severity.Success);
+    }
+
+    private async Task UpdateDuckDns()
+    {
+        try
+        {
+            var domain = _settings.DuckDnsDomain.Replace(".duckdns.org", "").Trim();
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            var r = await client.GetStringAsync($"https://www.duckdns.org/update?domains={domain}&token={_settings.DuckDnsToken}&ip=");
+            Snackbar.Add(r.StartsWith("OK") ? "DuckDNS обновлён" : "DuckDNS: ошибка",
+                r.StartsWith("OK") ? Severity.Success : Severity.Warning);
+        }
+        catch (Exception ex) { Snackbar.Add($"DuckDNS: {ex.Message}", Severity.Warning); }
+    }
+
+    private async Task CopyLink(string text)
+    {
+        await JS.InvokeVoidAsync("copyToClipboard", text);
+        Snackbar.Add("Ссылка скопирована", Severity.Success, c => c.VisibleStateDuration = 1500);
+    }
+
+    private async Task DoRestart()
+    {
+        _isRestarting = true;
+        StateHasChanged();
+
+        var host = new Uri(Nav.BaseUri).Host;
+        var newUrl = $"http://{host}:{_settings.Port}/setup";
+
+        Snackbar.Add($"Перезапуск... через 4 сек откроется новый адрес",
+            Severity.Info, c => c.VisibleStateDuration = 8000);
+
+        // Планируем редирект ДО запуска нового процесса (чтобы JS успел выполниться)
+        await JS.InvokeVoidAsync("scheduleRedirect", newUrl, 4000);
+        await Task.Delay(300);
+
+        if (!Restart.RestartApp())
+        {
+            _isRestarting = false;
+            Snackbar.Add("Не удалось перезапустить — закройте окно и запустите exe заново", Severity.Error);
+            StateHasChanged();
+        }
+    }
+}
