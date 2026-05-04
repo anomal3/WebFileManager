@@ -17,17 +17,14 @@
 ## Демонстрация
 
 <p align="center">
-  <video src="https://github.com/anomal3/WebFileManager/raw/master/CompanyFileManager/Wfm1.webm" controls width="800">
-    Ваш браузер не поддерживает встроенное воспроизведение видео.
-    <a href="CompanyFileManager/Wfm1.webm">Скачать видео</a>
-  </video>
+  <img src="CompanyFileManager/Wfm1.gif" alt="Демонстрация работы" width="900" />
 </p>
 
 <p align="center">
   <img src="CompanyFileManager/Wfm1.png" alt="Скриншот интерфейса" width="900" />
 </p>
 
-> Если видео не воспроизводится прямо в README — [откройте файл `Wfm1.webm`](CompanyFileManager/Wfm1.webm) или скачайте репозиторий.
+> [Скачать оригинал в WebM](CompanyFileManager/Wfm1.webm) (HD-качество, 2.3 МБ)
 
 ---
 
